@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#101a38">
+<meta name="description" content="Brinco y Aventuras 3D: juego de plataformas con 20 niveles para móvil.">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Brinco y Aventuras 3D</title>
+<style>
+:root{--ink:#eef5ff;--glass:#101a38dd;--gold:#ffd85a;--cyan:#64e7f2;--pink:#ff6b9d}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111b39;color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;touch-action:none}
+#game{position:absolute;inset:0;width:100%;height:100%;display:block}
+.top{position:fixed;top:max(9px,env(safe-area-inset-top));left:10px;right:10px;display:flex;justify-content:space-between;align-items:center;gap:7px;z-index:3;pointer-events:none}
+.stat{padding:7px 10px;border:1px solid #ffffff38;border-radius:13px;background:#111a36c9;backdrop-filter:blur(8px);font-size:clamp(11px,3vw,14px);font-weight:850;box-shadow:0 5px 20px #0002;white-space:nowrap}
+.stat b{color:var(--gold)}
+#overlay{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:18px;background:linear-gradient(#09122c52,#09122c99)}
+.panel{width:min(100%,440px);max-height:90dvh;overflow:auto;border:1px solid #ffffff35;border-radius:26px;padding:22px;background:linear-gradient(145deg,#1d2d5bf5,#11182ff5);box-shadow:0 24px 80px #0008;text-align:center}
+.logo{font-size:clamp(27px,8vw,42px);font-weight:1000;letter-spacing:-1.5px;line-height:1.0;margin:3px 0 9px;text-shadow:0 4px 0 #4b3c92}
+.logo span{color:var(--gold)}
+.sub{color:#c5d8ff;line-height:1.45;margin:8px 0 17px;font-size:14px}
+.btn{border:0;border-radius:15px;padding:13px 17px;background:linear-gradient(180deg,#ffe87a,#ffb72e);color:#202447;font-weight:950;font-size:15px;box-shadow:0 5px 0 #a96a25;cursor:pointer}
+.btn:active{transform:translateY(3px);box-shadow:0 2px 0 #a96a25}
+.btn.secondary{background:#263966;color:#f1f6ff;border:1px solid #ffffff24;box-shadow:0 4px 0 #10172e}
+.btn.small{padding:9px 12px;font-size:12px}
+.row{display:flex;gap:9px;justify-content:center;flex-wrap:wrap}
+.characters{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 17px}
+.char{padding:9px 5px;border:2px solid #ffffff22;border-radius:16px;background:#ffffff08;cursor:pointer;font-size:12px;font-weight:850}
+.char.selected{border-color:var(--gold);background:#ffd85a19}
+.avatar{height:52px;display:grid;place-items:center;font-size:36px;filter:drop-shadow(0 5px 2px #0005)}
+.levels{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:15px 0}
+.level{border:1px solid #ffffff28;background:#26365b;border-radius:10px;color:#fff;padding:10px 0;font-weight:900}
+.level:disabled{opacity:.35}
+.level.done{background:#2b8d7c}
+.note{font-size:11px;color:#aabce2;margin:12px 0 0}
+.controls{position:fixed;z-index:4;left:0;right:0;bottom:max(16px,env(safe-area-inset-bottom));display:flex;justify-content:space-between;align-items:flex-end;padding:0 17px;pointer-events:none}
+.pad{display:flex;gap:10px;pointer-events:auto}
+.ctrl{width:62px;height:62px;border-radius:22px;border:1px solid #ffffff9c;background:#101a38b8;color:white;font-size:24px;font-weight:900;backdrop-filter:blur(8px);box-shadow:0 5px 0 #070c20a8;touch-action:none}
+.ctrl.jump{width:82px;height:82px;border-radius:50%;background:linear-gradient(145deg,#ffe87a,#ffb62e);color:#222548;font-size:13px;border:3px solid #fff2bf}
+#hint{position:fixed;z-index:2;bottom:106px;left:0;right:0;text-align:center;font-size:11px;font-weight:850;color:#ffffffc9;text-shadow:0 2px 3px #000;pointer-events:none}
+#pause{position:fixed;z-index:4;right:12px;top:58px;border:1px solid #ffffff40;background:#101a38b8;color:#fff;border-radius:12px;padding:8px 11px;font-weight:900}
+@media(min-width:700px){.ctrl{width:70px;height:70px}.ctrl.jump{width:88px;height:88px}.controls{padding:0 30px}}
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Juego de plataformas"></canvas>
+<div class="top">
+ <div class="stat">⭐ <b id="score">0</b></div>
+ <div class="stat">❤️ <b id="lives">3</b></div>
+ <div class="stat">🌎 NIVEL <b id="levelNow">1</b>/20</div>
+</div>
+<button id="pause">Ⅱ</button>
+<div id="hint">◀ ▶ MOVER · SALTAR PARA BRINCAR</div>
+<div class="controls">
+ <div class="pad"><button class="ctrl" id="left" aria-label="Izquierda">◀</button><button class="ctrl" id="right" aria-label="Derecha">▶</button></div>
+ <button class="ctrl jump" id="jump">SALTAR ⤴</button>
+</div>
+<div id="overlay"><div class="panel" id="panel"></div></div>
+<script>
+(()=>{
+'use strict';
+const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),overlay=document.querySelector('#overlay'),panel=document.querySelector('#panel');
+const $=id=>document.getElementById(id);
+let W=innerWidth,H=innerHeight,dpr=1,ground=H*.78,cam=0,playing=false,paused=false,last=0,level=1,score=0,lives=3,character='🚀',soundOn=true,audio=null,keys={left:false,right:false,jump:false},jumpLatch=false,levelStars=[],enemies=[],platforms=[],world=2500,finish=0,particles=[],high=Number(localStorage.getItem('brincoHigh')||0),unlocked=Number(localStorage.getItem('brincoUnlocked')||1),levelStartScore=0,invincible=0,boss=null,stageTime=0;
+const chars=[['🚀','Explorador'],['🦊','Zorrito'],['🤖','Robot']]; 
+function resize(){W=innerWidth;H=innerHeight;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(dpr,0,0,dpr,0,0);ground=H-Math.max(115,H*.19)}
+addEventListener('resize',resize);resize();
+function beep(freq=440,dur=.08,type='sine',vol=.035){if(!soundOn)return;try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume();const o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(vol,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+dur);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+dur)}catch(e){}}
+function music(){if(!soundOn)return;const notes=[392,494,587,494,440,523,659,523];let i=0;const tick=()=>{if(!playing||paused||!soundOn)return;beep(notes[i++%notes.length],.12,'triangle',.012);musicTimer=setTimeout(tick,260)};clearTimeout(musicTimer);tick()}let musicTimer;
+function showMenu(mode='home',message=''){
+ playing=false;paused=false;overlay.style.display='flex';
+ if(mode==='home'){
+ panel.innerHTML=`<div class="logo">BRINCO <span>&</span><br>AVENTURAS <span>3D</span></div>
+ <p class="sub">¡Una aventura de plataformas con profundidad, poderes y 20 niveles! Corre, salta y derrota a los jefes para llegar a la meta.</p>
+ <div style="font-size:13px;font-weight:900">ELIGE TU PERSONAJE</div><div class="characters">${chars.map(([emoji,name])=>`<div class="char ${character===emoji?'selected':''}" data-char="${emoji}"><div class="avatar">${emoji}</div>${name}</div>`).join('')}</div>
+ <div class="row"><button class="btn" id="play">▶ JUGAR NIVEL ${Math.min(unlocked,20)}</button><button class="btn secondary" id="levelsBtn">NIVELES</button></div>
+ <div class="row" style="margin-top:10px"><button class="btn secondary small" id="soundBtn">${soundOn?'🔊 Sonido ON':'🔇 Sonido OFF'}</button><button class="btn secondary small" id="installBtn" style="display:none">⬇ INSTALAR</button></div>
+ <p class="note">Récord: ${high} puntos · Progreso guardado en este dispositivo</p><p class="note">Juego original; no afiliado a Mario Bros.</p>`;
+ panel.querySelectorAll('[data-char]').forEach(el=>el.onclick=()=>{character=el.dataset.char;showMenu('home')});
+ $('play').onclick=()=>startLevel(Math.min(unlocked,20));
+ $('levelsBtn').onclick=()=>showMenu('levels');
+ $('soundBtn').onclick=()=>{soundOn=!soundOn;showMenu('home');if(soundOn)music();else clearTimeout(musicTimer)};
+ if(deferredPrompt)$('installBtn').style.display='inline-block';
+ $('installBtn').onclick=installApp;
+ }else if(mode==='levels'){
+ panel.innerHTML=`<div class="logo">SELECCIONA <span>NIVEL</span></div><p class="sub">Completa cada nivel para desbloquear el siguiente. Cada quinto nivel tiene un jefe.</p><div class="levels">${Array.from({length:20},(_,i)=>`<button class="level ${i+1<unlocked?'done':''}" data-level="${i+1}" ${i+1>unlocked?'disabled':''}>${i+1}${(i+1)%5===0?' 👑':''}</button>`).join('')}</div><div class="row"><button class="btn secondary" id="back">← VOLVER</button></div><p class="note">Récord personal: ${high}</p>`;
+ panel.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>startLevel(Number(b.dataset.level)));$('back').onclick=()=>showMenu('home');
+ }else{
+ panel.innerHTML=`<div class="logo">${mode==='win'?'🏆 ¡NIVEL SUPERADO!':'💫 FIN DE PARTIDA'}</div><p class="sub">${message}</p><p class="sub">Puntuación: <b>${score}</b> · Récord: <b>${high}</b></p><div class="row"><button class="btn" id="next">${mode==='win'?(level===20?'JUGAR OTRA VEZ':'SIGUIENTE NIVEL'):'REINTENTAR'}</button><button class="btn secondary" id="menu">MENÚ</button></div>`;
+ $('next').onclick=()=>mode==='win'?(level===20?startLevel(1):startLevel(level+1)):startLevel(level);$('menu').onclick=()=>showMenu('home');
+ }
+}
+function makeLevel(n){
+ ground=H-Math.max(115,H*.19);world=2100+n*38;finish=world-70;cam=0;stageTime=0;particles=[];
+ platforms=[{x:0,w:360},{x:420,w:280},{x:760,w:330},{x:1150,w:260},{x:1470,w:310},{x:1840,w:world-1840}];
+ // add small elevated stepping stones and varying gaps
+ for(let i=0;i<5;i++){let x=250+i*365+(n%3)*18;platforms.push({x,w:95,y:ground-65-(i%2)*28})}
+ levelStars=Array.from({length:12+n%5},(_,i)=>({x:110+i*((world-230)/(11+n%5)),y:ground-60-((i+n)%3)*28,taken:false,spin:Math.random()*6}));
+ enemies=Array.from({length:4+Math.floor(n/3)},(_,i)=>{let lo=180+i*((world-420)/(4+Math.floor(n/3))),hi=Math.min(world-120,lo+130+(n%4)*15);return{x:lo+30,lo,hi,v:(1.1+(n%5)*.16)*(i%2?1:-1),alive:true,size: n%5===0&&i===0?1.25:1}});
+ boss=(n%5===0)?{x:world-260,y:ground-58,hp:4+n/5*2,max:4+n/5*2,dir:-1,active:true}:null;
+}
+const hero={x:55,y:0,w:32,h:42,vx:0,vy:0,on:false};
+function startLevel(n){level=Math.max(1,Math.min(20,n));levelStartScore=score;makeLevel(level);hero.x=55;hero.y=ground-hero.h;hero.vx=hero.vy=0;lives=Math.max(1,lives);invincible=0;playing=true;paused=false;overlay.style.display='none';$('levelNow').textContent=level;$('lives').textContent=lives;$('score').textContent=score;beep(600,.1);music()}
+function endGame(win){playing=false;clearTimeout(musicTimer);if(win){score+=100+level*20;unlocked=Math.max(unlocked,Math.min(20,level+1));localStorage.setItem('brincoUnlocked',unlocked);beep(880,.2);showMenu('win',level===20?'¡Has conquistado los 20 niveles y vencido todos los jefes!':'¡Buen trabajo! El siguiente nivel está desbloqueado.')}else{showMenu('lose','¡No te rindas! Ajusta el salto y vuelve a intentarlo.')}}
+function damage(){if(invincible>0)return;lives--;invincible=95;$('lives').textContent=lives;beep(130,.2,'sawtooth');if(lives<=0){score=Math.max(levelStartScore,score-10);endGame(false)}else{hero.x=Math.max(10,hero.x-85);hero.y=ground-hero.h;hero.vy=-3}}
+function collect(s){s.taken=true;score+=10;$('score').textContent=score;beep(750,.08,'sine',.025);for(let i=0;i<7;i++)particles.push({x:s.x,y:s.y,vx:(Math.random()-.5)*4,vy:-Math.random()*4,life:28})}
+function update(dt){if(!playing||paused)return;stageTime+=dt;
+ const speed=3.8;hero.vx=(keys.right?speed:0)-(keys.left?speed:0);hero.x=Math.max(0,Math.min(world-hero.w,hero.x+hero.vx*dt));
+ if(keys.jump&&!jumpLatch&&hero.on){hero.vy=-12.2;hero.on=false;jumpLatch=true;beep(330,.09,'triangle',.025)}if(!keys.jump)jumpLatch=false;
+ hero.vy+=.49*dt;let oldY=hero.y;hero.y+=hero.vy*dt;hero.on=false;
+ // collision with platform top surfaces
+ let landed=false;
+ for(const p of platforms){let py=p.y??ground;if(hero.x+hero.w>p.x&&hero.x<p.x+p.w&&oldY+hero.h<=py+8&&hero.y+hero.h>=py&&hero.vy>=0){hero.y=py-hero.h;hero.vy=0;hero.on=true;landed=true}}
+ if(hero.y>H+60){damage();hero.y=ground-hero.h}
+ for(const s of levelStars)if(!s.taken&&Math.abs(hero.x+hero.w/2-s.x)<22&&Math.abs(hero.y+hero.h/2-s.y)<30)collect(s);
+ for(const e of enemies){if(!e.alive)continue;e.x+=e.v*dt;if(e.x<e.lo||e.x>e.hi)e.v*=-1;if(hero.x+hero.w>e.x-15&&hero.x<e.x+15&&hero.y+hero.h>ground-28&&hero.y<ground+5){if(hero.vy>1&&hero.y+hero.h<ground-8){e.alive=false;hero.vy=-7;score+=25;$('score').textContent=score;beep(210,.08,'square')}else damage()}}
+ if(boss?.active){boss.x+=boss.dir*(1.0+level*.035)*dt;if(boss.x<finish-150||boss.x>finish-55)boss.dir*=-1;if(hero.x+hero.w>boss.x-28&&hero.x<boss.x+28&&hero.y+hero.h>boss.y){if(hero.vy>1&&hero.y+hero.h<boss.y+25){boss.hp--;hero.vy=-9;beep(180,.12,'square');if(boss.hp<=0){boss.active=false;score+=150;$('score').textContent=score}}else damage()}}
+ if(invincible>0)invincible-=dt;cam=Math.max(0,Math.min(world-W,hero.x-W*.36));
+ if(hero.x>finish&&(!boss||!boss.active))endGame(true);
+ for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.vy+=.12;p.life-=dt}particles=particles.filter(p=>p.life>0);
+}
+function polygon(points,fill,stroke){ctx.beginPath();ctx.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)ctx.lineTo(points[i][0],points[i][1]);ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke()}}
+function draw(){ground=H-Math.max(115,H*.19);let sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#141e4a');sky.addColorStop(.55,'#476dc2');sky.addColorStop(1,'#f8a66d');ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+ // 3D parallax mountains
+ for(let i=0;i<8;i++){let x=((i*180-cam*.18)%(W+240)+W+240)%(W+240)-100;polygon([[x,ground-15],[x+75,ground-145-(i%3)*22],[x+165,ground-15]],i%2?'#344a91':'#293a79');polygon([[x+75,ground-145-(i%3)*22],[x+110,ground-75],[x+165,ground-15]],'#6179b4')}
+ for(let i=0;i<5;i++){let x=((i*210-cam*.32)%(W+250)+W+250)%(W+250)-90;ctx.fillStyle='#ffffffcc';ctx.beginPath();ctx.ellipse(x+25,70+i%3*42,28,9,0,0,Math.PI*2);ctx.ellipse(x+45,65+i%3*42,22,12,0,0,Math.PI*2);ctx.fill()}
+ // ground platforms with faux 3D sides
+ for(const p of platforms){let x=p.x-cam,py=p.y??ground;if(x+p.w<0||x>W)continue;rect3D(x,py,p.w,Math.max(12,H-py),'#36bb85','#208c76','#155c68')}
+ // decorative pillars
+ for(let i=0;i<7;i++){let x=((i*390-cam*.8)%(W+150)+W+150)%(W+150)-50;polygon([[x,ground-5],[x+22,ground-55],[x+46,ground-5]],'#e9a24c','#9a5e4c')}
+ // stars
+ for(const s of levelStars){if(s.taken)continue;let x=s.x-cam;if(x<-30||x>W+30)continue;ctx.save();ctx.translate(x,s.y+Math.sin(stageTime*.08+s.spin)*4);ctx.rotate(stageTime*.035+s.spin);polygon([[0,-13],[4,-4],[13,-4],[6,2],[9,12],[0,6],[-9,12],[-6,2],[-13,-4],[-4,-4]],'#ffe45e','#fff6b2');ctx.restore()}
+ // enemies with pseudo-depth shadows
+ for(const e of enemies){if(!e.alive)continue;let x=e.x-cam;if(x<-35||x>W+35)continue;ctx.fillStyle='#11142e66';ctx.beginPath();ctx.ellipse(x,ground+2,20,5,0,0,Math.PI*2);ctx.fill();polygon([[x-17,ground-20],[x-12,ground-36],[x-3,ground-27],[x+8,ground-37],[x+18,ground-20],[x+12,ground-5],[x-12,ground-5]],'#ff5d7c','#a12d65');rect3D(x-10,ground-25,6,7,'#fff','#d7eaff','#9caed4');rect3D(x+5,ground-25,6,7,'#fff','#d7eaff','#9caed4');rect3D(x-7,ground-23,3,4,'#202347','#202347','#202347');rect3D(x+7,ground-23,3,4,'#202347','#202347','#202347')}
+ if(boss?.active){let x=boss.x-cam,y=ground-58;ctx.fillStyle='#11142e66';ctx.beginPath();ctx.ellipse(x,y+60,38,8,0,0,Math.PI*2);ctx.fill();polygon([[x-30,y+10],[x-40,y-20],[x-17,y-9],[x,y-38],[x+18,y-10],[x+38,y-23],[x+29,y+17],[x+23,y+52],[x-25,y+52]],'#8b5cf6','#e6d5ff');rect3D(x-20,y+1,10,12,'#fff','#fff','#c5b6ff');rect3D(x+10,y+1,10,12,'#fff','#fff','#c5b6ff');rect3D(x-17,y+4,5,7,'#202347','#202347','#202347');rect3D(x+13,y+4,5,7,'#202347','#202347','#202347');rect3D(x-35,y-54,70,8,'#31245c','#31245c','#31245c');rect3D(x-35,y-54,70*Math.max(0,boss.hp/boss.max),8,'#ff557e','#ffb1c9','#c92859')}
+ // finish gate
+ let fx=finish-cam;if(fx>-40&&fx<W+40){rect3D(fx,ground-110,8,110,'#e8f2ff','#a5c5ff','#6d88bf');polygon([[fx+8,ground-108],[fx+62,ground-91],[fx+8,ground-74]],'#ffe45e','#fff2ac')}
+ // player with shadow, layered cartoon 3D
+ let x=hero.x-cam,y=hero.y;if(invincible<=0||Math.floor(invincible/5)%2===0){ctx.fillStyle='#10142c66';ctx.beginPath();ctx.ellipse(x+16,ground+2,18,5,0,0,Math.PI*2);ctx.fill();polygon([[x+4,y+12],[x+28,y+12],[x+31,y+34],[x+24,y+39],[x+7,y+39],[x+1,y+34]],character==='🦊'?'#f18b39':character==='🤖'?'#75d9e8':'#ff8a4b','#fff0c9');polygon([[x+4,y+13],[x+4,y+4],[x+10,y],[x+25,y+2],[x+29,y+8],[x+27,y+15]],character==='🦊'?'#f7c17b':character==='🤖'?'#a7f0f2':'#f6c5a0','#fff0c9');polygon([[x+2,y+5],[x+7,y-3],[x+26,y-3],[x+31,y+5]],character==='🤖'?'#4a93bc':'#3475ed','#9fd7ff');rect3D(x+8,y+16,5,7,'#fff','#fff','#cdd9ff');rect3D(x+20,y+16,5,7,'#fff','#fff','#cdd9ff');rect3D(x+10,y+18,2,4,'#1d2854','#1d2854','#1d2854');rect3D(x+22,y+18,2,4,'#1d2854','#1d2854','#1d2854');rect3D(x+5,y+36,9,7,'#253056','#51639a','#18203f');rect3D(x+20,y+36,9,7,'#253056','#51639a','#18203f')}
+ for(const p of particles){ctx.globalAlpha=Math.max(0,p.life/28);ctx.fillStyle='#ffe45e';ctx.beginPath();ctx.arc(p.x-cam,p.y,3,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1}
+ if(!playing){ctx.fillStyle='#ffffff12';ctx.fillRect(0,0,W,H)}
+}
+function rect3D(x,y,w,h,top,side,edge){ctx.fillStyle=side;ctx.fillRect(x,y+5,w,h);polygon([[x,y],[x+w,y],[x+w-7,y+5],[x+7,y+5]],top,edge);ctx.fillStyle=edge;ctx.fillRect(x,y+5,w,Math.min(4,h))}
+function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x,y,w,h)}
+function loop(t){let dt=Math.min((t-last)/16.67||1,2);last=t;update(dt);draw();requestAnimationFrame(loop)}
+function hold(id,key){let el=$(id);const down=e=>{e.preventDefault();keys[key]=true;try{el.setPointerCapture(e.pointerId)}catch(_){}};const up=e=>{e.preventDefault();keys[key]=false};el.addEventListener('pointerdown',down);['pointerup','pointercancel','lostpointercapture'].forEach(ev=>el.addEventListener(ev,up))}
+hold('left','left');hold('right','right');hold('jump','jump');
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='a')keys.left=true;if(e.key==='ArrowRight'||e.key==='d')keys.right=true;if(e.key===' '||e.key==='ArrowUp'||e.key==='w')keys.jump=true;if(e.key==='Escape')togglePause()});
+addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='a')keys.left=false;if(e.key==='ArrowRight'||e.key==='d')keys.right=false;if(e.key===' '||e.key==='ArrowUp'||e.key==='w')keys.jump=false});
+function togglePause(){if(!playing)return;paused=!paused;if(paused){clearTimeout(musicTimer);overlay.style.display='flex';panel.innerHTML=`<div class="logo">PAUSA</div><p class="sub">Toma aire, aventurero.</p><div class="row"><button class="btn" id="resume">CONTINUAR</button><button class="btn secondary" id="exit">SALIR AL MENÚ</button></div>`;$('resume').onclick=()=>{overlay.style.display='none';paused=false;music()};$('exit').onclick=()=>showMenu('home')}else{overlay.style.display='none';music()}}
+$('pause').onclick=togglePause;
+let deferredPrompt=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;if($('installBtn'))$('installBtn').style.display='inline-block'});
+async function installApp(){if(deferredPrompt){deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null}else alert('Para instalar: abre el sitio publicado en Chrome, toca ⋮ y elige “Instalar aplicación” o “Añadir a pantalla principal”.')}
+if('serviceWorker'in navigator&&location.protocol.startsWith('http'))addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+showMenu('home');requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
